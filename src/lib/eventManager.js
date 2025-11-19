@@ -2,6 +2,9 @@
 // element -> { eventType -> Set<handler> }
 const eventHandlers = new WeakMap();
 
+// root에 이미 설정된 이벤트 타입을 추적
+const setupRoots = new WeakMap();
+
 export function setupEventListeners(root) {
   // 이벤트 위임: root에 등록된 모든 이벤트 타입에 대해 리스너 설정
   const eventTypes = new Set();
@@ -19,32 +22,39 @@ export function setupEventListeners(root) {
 
   collectEventTypes(root);
 
-  // 각 이벤트 타입에 대해 root에 위임 리스너 등록
-  eventTypes.forEach((eventType) => {
-    root.addEventListener(eventType, (event) => {
-      // 이벤트 버블링을 통해 타겟부터 root까지 순회
-      let target = event.target;
+  const existingTypes = setupRoots.get(root) || new Set();
 
-      while (target && target !== root) {
-        const handlers = eventHandlers.get(target);
-        if (handlers && handlers[eventType]) {
-          // 등록된 모든 핸들러 실행
-          handlers[eventType].forEach((handler) => {
+  // 각 이벤트 타입에 대해 root에 위임 리스너 등록 (중복 방지)
+  eventTypes.forEach((eventType) => {
+    if (!existingTypes.has(eventType)) {
+      root.addEventListener(eventType, (event) => {
+        // 이벤트 버블링을 통해 타겟부터 root까지 순회
+        let target = event.target;
+
+        while (target && target !== root) {
+          const handlers = eventHandlers.get(target);
+          if (handlers && handlers[eventType]) {
+            // 등록된 모든 핸들러 실행
+            handlers[eventType].forEach((handler) => {
+              handler(event);
+            });
+          }
+          target = target.parentElement;
+        }
+
+        // root 자체에 등록된 핸들러도 확인
+        const rootHandlers = eventHandlers.get(root);
+        if (rootHandlers && rootHandlers[eventType]) {
+          rootHandlers[eventType].forEach((handler) => {
             handler(event);
           });
         }
-        target = target.parentElement;
-      }
-
-      // root 자체에 등록된 핸들러도 확인
-      const rootHandlers = eventHandlers.get(root);
-      if (rootHandlers && rootHandlers[eventType]) {
-        rootHandlers[eventType].forEach((handler) => {
-          handler(event);
-        });
-      }
-    });
+      });
+      existingTypes.add(eventType);
+    }
   });
+
+  setupRoots.set(root, existingTypes);
 }
 
 export function addEvent(element, eventType, handler) {

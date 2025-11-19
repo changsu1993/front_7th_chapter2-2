@@ -1,8 +1,8 @@
 import { addEvent } from "./eventManager";
 
 export function createElement(vNode) {
-  // 1. vNode가 null, undefined, boolean일 경우 빈 텍스트 노드 반환
-  if (vNode == null || typeof vNode === "boolean") {
+  // 1. vNode가 null, undefined, boolean, 빈 문자열일 경우 빈 텍스트 노드 반환
+  if (vNode == null || typeof vNode === "boolean" || vNode === "") {
     return document.createTextNode("");
   }
 
@@ -36,7 +36,14 @@ export function createElement(vNode) {
   // 7. 자식 요소 추가
   if (vNode.children) {
     vNode.children.forEach((child) => {
-      $el.appendChild(createElement(child));
+      const childElement = createElement(child);
+      // 빈 텍스트 노드가 아닌 경우에만 추가
+      if (
+        childElement.nodeType !== Node.TEXT_NODE ||
+        childElement.textContent !== ""
+      ) {
+        $el.appendChild(childElement);
+      }
     });
   }
 
@@ -53,6 +60,12 @@ function updateAttributes($el, props) {
     // className 처리
     else if (key === "className") {
       $el.setAttribute("class", value);
+    }
+    // 불리언 속성 처리 (disabled, checked 등)
+    else if (typeof value === "boolean") {
+      if (value) {
+        $el.setAttribute(key, "");
+      }
     }
     // 일반 속성 처리
     else {
